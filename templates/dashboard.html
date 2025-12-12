@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - ecovendíx</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <img src="/static/logo.svg" alt="logo">
+                </div>
+                <div class="header-text">
+                    <h1 class="app-name">ecovendix</h1>
+                    <p class="app-subtitle">Recycle / Shop machine</p>
+                </div>
+            </div>
+            <a href="/logout" class="logout-btn">
+                <img src="/static/logout.svg" alt="logout">
+            </a>
+        </header>
+        
+        {% if error %}
+        <div class="error-message" style="margin-bottom: 20px;">{{ error }}</div>
+        {% endif %}
+        
+        <!-- User Info -->
+        <div class="user-info-section">
+            <div class="user-avatar">
+                <div class="avatar-circle">{{ user.name[0].upper() }}</div>
+                <div class="user-details">
+                    <p class="user-name">{{ user.name }}</p>
+                    <p class="user-id">@{{ user.student_id }}</p>
+                </div>
+            </div>
+            <div class="points-display">
+                <div class="points-icon">
+                    <img src="/static/points-user-info.svg" alt="points">
+                </div>
+                <div class="points-info">
+                    <p class="points-value">{{ user.points }}</p>
+                    <p class="points-label">Your points</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Column -->
+            <div class="left-column">
+                <!-- Our Shop -->
+                <section class="shop-section">
+                    <h2 class="section-title">Our Shop</h2>
+                    <p class="section-subtitle">Buy anything if you have enough points.</p>
+                    <div class="products-grid">
+                        {% for product in products %}
+                        <div class="product-card {% if product.stock_quantity == 0 %}out-of-stock{% endif %}">
+                            <img src="/static/{{ product.icon_name }}" alt="{{ product.name }}" class="product-icon">
+                            <div class="product-info">
+                                <p class="product-name">{{ product.name }}</p>
+                                <p class="product-cost">{{ product.cost_points }}pts</p>
+                                <div class="product-stock">
+                                    {% if product.stock_quantity > 0 %}
+                                    <img src="/static/item-avaliable.svg" alt="available" class="stock-icon">
+                                    <span class="stock-text">{{ product.stock_quantity }} left</span>
+                                    {% else %}
+                                    <img src="/static/item-not-avaliable.svg" alt="not available" class="stock-icon">
+                                    <span class="stock-text">0 left</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+                
+                <!-- Your History -->
+                <section class="history-section">
+                    <h2 class="section-title">Your History</h2>
+                    <p class="section-subtitle">Transactions either buying or recycling.</p>
+                    <div class="history-table-container">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Item</th>
+                                    <th>Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if transactions %}
+                                {% for transaction in transactions %}
+                                <tr>
+                                    <td>{{ transaction.timestamp.strftime('%b %d, %Y') }}</td>
+                                    <td>{{ transaction.item_name }}</td>
+                                    <td class="{% if transaction.point_change < 0 %}points-negative{% else %}points-positive{% endif %}">
+                                        {% if transaction.point_change < 0 %}-{% else %}+{% endif %} {{ transaction.point_change|abs }}pts
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="no-transactions">No transactions yet</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+            
+            <!-- Right Column -->
+            <div class="right-column">
+                <!-- Ranking -->
+                <section class="ranking-section">
+                    <h2 class="section-title">Ranking</h2>
+                    <p class="section-subtitle">Your rank and who is in the leadership.</p>
+                    
+                    <div class="user-rank-display">
+                        <p class="rank-number">#{{ user_rank }}</p>
+                        <p class="rank-label">Your Rank</p>
+                    </div>
+                    
+                    <div class="leaders-list">
+                        <h3 class="leaders-title">Top Leaders</h3>
+                        {% for leader in top_users %}
+                        <div class="leader-item rank-{{ loop.index }}">
+                            <div class="rank-badge">
+                                {% if loop.index == 1 %}
+                                <img src="/static/rank-one.svg" alt="rank 1">
+                                {% elif loop.index == 2 %}
+                                <img src="/static/rank-two.svg" alt="rank 2">
+                                {% elif loop.index == 3 %}
+                                <img src="/static/rank-three.svg" alt="rank 3">
+                                {% elif loop.index == 4 %}
+                                <img src="/static/rank-four.svg" alt="rank 4">
+                                {% elif loop.index == 5 %}
+                                <img src="/static/rank-five.svg" alt="rank 5">
+                                {% else %}
+                                <img src="/static/rank-six.svg" alt="rank 6">
+                                {% endif %}
+                            </div>
+                            <div class="leader-info">
+                                <p class="leader-name">{{ leader.name }}</p>
+                                <p class="leader-points">Points {{ leader.points }}pts</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
