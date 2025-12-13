@@ -43,8 +43,8 @@ A web application for managing recycling points and shopping system built with F
 4. **Access the application:**
    - Open your browser and go to `http://localhost:8000`
    - Default admin credentials:
-     - StudentID: `000000000`
-     - Password: `admin123`
+     - StudentID: `0`
+     - Password: `1234`
 
 ## Database
 
