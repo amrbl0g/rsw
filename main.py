@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,7 +10,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from database import init_db, get_db, SessionLocal, User, Product, Transaction
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="your-secret-key-change-in-production")
+SESSION_SECRET = os.getenv("SESSION_SECRET", "change-me-in-production")
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -391,5 +393,5 @@ async def logout(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
 
