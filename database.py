@@ -41,20 +41,38 @@ class Transaction(Base):
     user = relationship("User")
 
 # Database setup
-# Prefer a full DATABASE_URL (as provided by Railway), fall back to individual MySQL parts.
+# Prefer a full DATABASE_URL (as provided by Railway), otherwise assemble from available MySQL pieces.
+
+def _build_mysql_url(prefix: str) -> str | None:
+    """Construct a MySQL URL from env parts. Returns None if host or database missing."""
+    user = os.getenv(f"{prefix}MYSQL_USER") or os.getenv(f"{prefix}MYSQLUSERNAME")
+    password = os.getenv(f"{prefix}MYSQL_PASSWORD") or os.getenv(f"{prefix}MYSQLPASSWORD") or ""
+    host = os.getenv(f"{prefix}MYSQL_HOST") or os.getenv(f"{prefix}MYSQLHOST")
+    port = os.getenv(f"{prefix}MYSQL_PORT") or os.getenv(f"{prefix}MYSQLPORT") or "3306"
+    database = os.getenv(f"{prefix}MYSQL_DATABASE") or os.getenv(f"{prefix}MYSQLDATABASE")
+    if not host or not database:
+        return None
+    user = user or "root"
+    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
+
 database_url = os.getenv("DATABASE_URL") or os.getenv("RAILWAY_DATABASE_URL")
+if not database_url:
+    # Try common Railway variable names without DATABASE_URL
+    database_url = _build_mysql_url(prefix="")
+
 if database_url:
     # SQLAlchemy needs the pymysql driver prefix for MySQL URLs
     if database_url.startswith("mysql://"):
         database_url = database_url.replace("mysql://", "mysql+pymysql://", 1)
     SQLALCHEMY_DATABASE_URL = database_url
 else:
-    MYSQL_USER = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-    MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
-    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "ecovendix")
-    SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+    # Last resort fallback to localhost dev defaults
+    SQLALCHEMY_DATABASE_URL = "mysql+pymysql://root:@localhost:3306/ecovendix"
+
+# Log a minimal connection summary for debugging (no password).
+_dbg_host = SQLALCHEMY_DATABASE_URL.split("@")[-1].split("/")[0]
+_dbg_db = SQLALCHEMY_DATABASE_URL.rsplit("/", 1)[-1]
+print(f"[database] Using MySQL at {_dbg_host}, db={_dbg_db}")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
