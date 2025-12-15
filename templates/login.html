@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% if mode == 'login' %}Login{% else %}Create Account{% endif %} - ecovendíx</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="auth-body">
@@ -26,13 +27,13 @@
             <form method="POST" action="/api/signup" class="auth-form" id="signupForm">
                 <input type="text" name="name" placeholder="Enter your name" required class="auth-input">
                 <input type="text" name="student_id" placeholder="Enter your StudentID" required class="auth-input" id="studentIdInput" pattern="[0-9]{9,10}">
-                <input type="password" name="password" placeholder="Enter your password" required class="auth-input">
+                <input type="password" name="password" placeholder="Enter your password (4 digits)" required class="auth-input" id="passwordInput" pattern="[0-9]{4}" maxlength="4">
                 <button type="submit" class="auth-button">Create Account</button>
             </form>
             {% else %}
             <form method="POST" action="/api/login" class="auth-form" id="loginForm">
                 <input type="text" name="student_id" placeholder="Enter your StudentID" required class="auth-input" id="studentIdInput" pattern="[0-9]{9,10}">
-                <input type="password" name="password" placeholder="Enter your password" required class="auth-input">
+                <input type="password" name="password" placeholder="Enter your password (4 digits)" required class="auth-input" id="passwordInput" pattern="[0-9]{4}" maxlength="4">
                 <button type="submit" class="auth-button">Login</button>
             </form>
             {% endif %}
@@ -51,12 +52,37 @@
             }
         });
         
+        // Validate Password on input (only allow digits, max 4)
+        document.getElementById('passwordInput')?.addEventListener('input', function(e) {
+            const value = e.target.value;
+            // Only allow digits
+            e.target.value = value.replace(/[^0-9]/g, '');
+            // Limit to 4 digits
+            if (e.target.value.length > 4) {
+                e.target.value = e.target.value.slice(0, 4);
+            }
+            const isValid = /^[0-9]{4}$/.test(e.target.value);
+            if (e.target.value && !isValid) {
+                e.target.setCustomValidity('Password must be exactly 4 digits');
+            } else {
+                e.target.setCustomValidity('');
+            }
+        });
+        
         // Validate on form submit
         document.getElementById('{{ mode }}Form')?.addEventListener('submit', function(e) {
             const studentId = document.getElementById('studentIdInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
             if (!/^[0-9]{9,10}$/.test(studentId)) {
                 e.preventDefault();
                 alert('StudentID must be numeric and 9-10 digits in length');
+                return false;
+            }
+            
+            if (!/^[0-9]{4}$/.test(password)) {
+                e.preventDefault();
+                alert('Password must be exactly 4 digits');
                 return false;
             }
         });

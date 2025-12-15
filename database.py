@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -15,8 +15,8 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
-    student_id = Column(String(10), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    student_id = Column(Integer, unique=True, nullable=False, index=True)
+    password = Column(Integer, nullable=False)
     points = Column(Integer, default=0)
     is_admin = Column(Boolean, default=False)
 
@@ -52,7 +52,96 @@ SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+def migrate_password_column():
+    """Migrate password_hash column to password column"""
+    try:
+        with engine.begin() as conn:
+            # Check if users table exists
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'users'
+            """))
+            table_exists = result.fetchone()[0] > 0
+            
+            if not table_exists:
+                # Table doesn't exist yet, migration not needed
+                return
+            
+            # Check if password_hash column exists
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'users'
+                AND COLUMN_NAME = 'password_hash'
+            """))
+            has_old_column = result.fetchone()[0] > 0
+            
+            if has_old_column:
+                # Check if password column already exists
+                result = conn.execute(text("""
+                    SELECT COUNT(*) as count
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'users'
+                    AND COLUMN_NAME = 'password'
+                """))
+                has_new_column = result.fetchone()[0] > 0
+                
+                if not has_new_column:
+                    # Add new password column with default value
+                    conn.execute(text("ALTER TABLE users ADD COLUMN password INT DEFAULT 1234"))
+                
+                # Drop old password_hash column
+                conn.execute(text("ALTER TABLE users DROP COLUMN password_hash"))
+                print("Migration completed: password_hash -> password")
+    except Exception as e:
+        print(f"Migration warning: {e}")
+        # Continue anyway - table might not exist yet
+
+def migrate_student_id_column():
+    """Migrate student_id column from VARCHAR to INT"""
+    try:
+        with engine.begin() as conn:
+            # Check if users table exists
+            result = conn.execute(text("""
+                SELECT COUNT(*) as count
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'users'
+            """))
+            table_exists = result.fetchone()[0] > 0
+            
+            if not table_exists:
+                # Table doesn't exist yet, migration not needed
+                return
+            
+            # Check current column type
+            result = conn.execute(text("""
+                SELECT DATA_TYPE
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'users'
+                AND COLUMN_NAME = 'student_id'
+            """))
+            column_info = result.fetchone()
+            
+            if column_info and column_info[0] in ['varchar', 'char', 'text']:
+                # Convert VARCHAR to INT
+                # First, ensure all values are numeric (they should be based on validation)
+                conn.execute(text("ALTER TABLE users MODIFY COLUMN student_id INT"))
+                print("Migration completed: student_id VARCHAR -> INT")
+    except Exception as e:
+        print(f"Migration warning: {e}")
+        # Continue anyway - table might not exist yet or already migrated
+
 def init_db():
+    # Run migrations first
+    migrate_password_column()
+    migrate_student_id_column()
+    
     Base.metadata.create_all(bind=engine)
     
     # Seed default products
@@ -61,11 +150,11 @@ def init_db():
         # Check if products already exist
         if db.query(Product).count() == 0:
             products = [
-                Product(name="Water", cost_points=15, stock_quantity=11, icon_name="water.png"),
-                Product(name="Drink", cost_points=25, stock_quantity=15, icon_name="drink.png"),
-                Product(name="Soda", cost_points=35, stock_quantity=9, icon_name="soda.png"),
-                Product(name="Snacks", cost_points=30, stock_quantity=20, icon_name="Snacks.png"),
-                Product(name="Chocolate", cost_points=50, stock_quantity=13, icon_name="chocolate.png"),
+                Product(name="Water", cost_points=15, stock_quantity=0, icon_name="water.png"),
+                Product(name="Drink", cost_points=25, stock_quantity=0, icon_name="drink.png"),
+                Product(name="Soda", cost_points=35, stock_quantity=0, icon_name="soda.png"),
+                Product(name="Snacks", cost_points=30, stock_quantity=0, icon_name="Snacks.png"),
+                Product(name="Chocolate", cost_points=50, stock_quantity=0, icon_name="chocolate.png"),
                 Product(name="Biscuit", cost_points=30, stock_quantity=0, icon_name="biscuit.png"),
             ]
             for product in products:

@@ -3,7 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-import bcrypt
 from datetime import datetime
 import re
 from starlette.middleware.sessions import SessionMiddleware
@@ -25,12 +24,12 @@ async def startup_event():
     # Create default admin user if it doesn't exist
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.student_id == "000000000").first()
+        admin = db.query(User).filter(User.student_id == 0).first()
         if not admin:
             admin = User(
                 name="Admin",
-                student_id="000000000",
-                password_hash=get_password_hash("admin123"),
+                student_id=0,  # Admin student_id: 0
+                password=1234,  # Default admin password: 1234
                 points=0,
                 is_admin=True
             )
@@ -39,11 +38,15 @@ async def startup_event():
     finally:
         db.close()
 
-def verify_password(plain_password, hashed_password):
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-
-def get_password_hash(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+def validate_password(password: str) -> bool:
+    """Validate password: must be exactly 4 digits"""
+    if not password:
+        return False
+    if not password.isdigit():
+        return False
+    if len(password) != 4:
+        return False
+    return True
 
 def validate_student_id(student_id: str) -> bool:
     """Validate StudentID: must be numeric and 9-10 digits"""
@@ -70,6 +73,34 @@ async def root(request: Request):
         return RedirectResponse(url="/dashboard", status_code=303)
     return RedirectResponse(url="/login", status_code=303)
 
+# Captive Portal Detection Endpoints
+# These endpoints are used by devices to detect captive portals
+# They redirect to home page to trigger captive portal login
+@app.get("/generate_204")
+async def generate_204(request: Request):
+    """Android captive portal detection - redirects to home"""
+    return RedirectResponse(url="/", status_code=302)
+
+@app.get("/success.txt")
+async def success_txt(request: Request):
+    """iOS captive portal detection - redirects to home"""
+    return RedirectResponse(url="/", status_code=302)
+
+@app.get("/hotspot-detect.html")
+async def hotspot_detect(request: Request):
+    """iOS captive portal detection - redirects to home"""
+    return RedirectResponse(url="/", status_code=302)
+
+@app.get("/connecttest.txt")
+async def connecttest_txt(request: Request):
+    """Windows captive portal detection - redirects to home"""
+    return RedirectResponse(url="/", status_code=302)
+
+@app.get("/ncsi.txt")
+async def ncsi_txt(request: Request):
+    """Windows Network Connectivity Status Indicator - redirects to home"""
+    return RedirectResponse(url="/", status_code=302)
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page"""
@@ -94,8 +125,23 @@ async def login(
             {"request": request, "mode": "login", "error": "Invalid StudentID. Must be 9-10 digits."}
         )
     
-    user = db.query(User).filter(User.student_id == student_id).first()
-    if not user or not verify_password(password, user.password_hash):
+    if not validate_password(password):
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "mode": "login", "error": "Invalid password. Must be exactly 4 digits."}
+        )
+    
+    # Convert student_id to integer
+    try:
+        student_id_int = int(student_id)
+    except ValueError:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "mode": "login", "error": "Invalid StudentID. Must be numeric."}
+        )
+    
+    user = db.query(User).filter(User.student_id == student_id_int).first()
+    if not user or user.password != int(password):
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "mode": "login", "error": "Invalid StudentID or password."}
@@ -123,8 +169,23 @@ async def signup(
             {"request": request, "mode": "signup", "error": "Invalid StudentID. Must be 9-10 digits."}
         )
     
+    if not validate_password(password):
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "mode": "signup", "error": "Invalid password. Must be exactly 4 digits."}
+        )
+    
+    # Convert student_id to integer
+    try:
+        student_id_int = int(student_id)
+    except ValueError:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "mode": "signup", "error": "Invalid StudentID. Must be numeric."}
+        )
+    
     # Check if user already exists
-    existing_user = db.query(User).filter(User.student_id == student_id).first()
+    existing_user = db.query(User).filter(User.student_id == student_id_int).first()
     if existing_user:
         return templates.TemplateResponse(
             "login.html",
@@ -134,8 +195,8 @@ async def signup(
     # Create new user
     new_user = User(
         name=name,
-        student_id=student_id,
-        password_hash=get_password_hash(password),
+        student_id=student_id_int,
+        password=int(password),
         points=0,
         is_admin=False
     )
